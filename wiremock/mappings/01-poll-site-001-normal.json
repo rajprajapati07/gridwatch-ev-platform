@@ -1,0 +1,43 @@
+{
+  "name": "Normal poll for site-001 — returns mixed event types",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/v1/chargers",
+    "queryParameters": {
+      "site_id": { "equalTo": "site-001" }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "site_id": "site-001",
+      "server_time": "{{now format='yyyy-MM-dd\\'T\\'HH:mm:ssZ'}}",
+      "next_cursor": null,
+      "events": [
+        {
+          "charger_id": "CHR-001",
+          "connector_id": "C1",
+          "type": "status",
+          "status": "Charging",
+          "ts": "2024-01-15T10:29:55+05:30"
+        },
+        {
+          "charger_id": "CHR-001",
+          "connector_id": "C2",
+          "type": "status",
+          "status": "Available",
+          "ts": "2024-01-15T10:25:00+05:30"
+        },
+        {
+          "charger_id": "CHR-001",
+          "connector_id": "C1",
+          "type": "meter_value",
+          "energy_register_wh": 187450,
+          "power_w": 22000,
+          "ts": "2024-01-15T10:29:55+05:30"
+        }
+      ]
+    }
+  }
+}

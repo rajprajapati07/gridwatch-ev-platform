@@ -1,0 +1,77 @@
+spring:
+  application:
+    name: gridwatch-ingestion
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:gridwatch}
+    username: ${DB_USER:gridwatch}
+    password: ${DB_PASSWORD:gridwatch}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          time_zone: UTC
+    open-in-view: false
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+    consumer:
+      group-id: gridwatch-ingestion
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.gridwatch.*"
+
+gridwatch:
+  csms:
+    base-url: ${CSMS_BASE_URL:http://localhost:8099}
+    webhook-secret: ${CSMS_WEBHOOK_SECRET:changeme-dev-secret}
+    poll-interval-seconds: 30
+    max-retries: 3
+    retry-backoff-seconds: 5
+  kafka:
+    topic: csms.events.raw
+  geocoding:
+    nominatim-url: https://nominatim.openstreetmap.org
+    google-maps-key: ${GOOGLE_MAPS_API_KEY:}
+  live-status-ttl-seconds: 60
+  site-summary-ttl-seconds: 15
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{traceId}] %logger{36} - %msg%n"
+  level:
+    com.gridwatch: INFO
+    org.springframework.kafka: WARN

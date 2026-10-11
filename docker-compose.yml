@@ -1,0 +1,160 @@
+version: "3.9"
+
+# GridWatch local development stack
+#
+# Services:
+#   postgres   — TimescaleDB + PostGIS (all DB + schema migrations)
+#   redis      — Live status cache + dedup
+#   zookeeper  — Kafka metadata coordination
+#   kafka      — Event bus (csms.events.raw topic)
+#   csms-stub  — WireMock simulating the vendor CSMS API (webhook + poll)
+#   gridwatch  — The application itself
+#
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f gridwatch
+#   curl http://localhost:8080/actuator/health
+
+services:
+
+  # ─── PostgreSQL with TimescaleDB + PostGIS ──────────────────────────────────
+  postgres:
+    image: timescale/timescaledb-ha:pg16-latest
+    container_name: gw-postgres
+    environment:
+      POSTGRES_DB: gridwatch
+      POSTGRES_USER: gridwatch
+      POSTGRES_PASSWORD: gridwatch_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gridwatch -d gridwatch"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    command: >
+      postgres
+        -c shared_preload_libraries=timescaledb
+        -c log_min_duration_statement=500
+
+  # ─── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: gw-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ─── Zookeeper (Kafka dependency) ──────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: gw-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Kafka ──────────────────────────────────────────────────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: gw-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1       # 1 broker in dev; 3 in prod
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1                     # relax for single-broker dev
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168                   # 7 days
+    ports:
+      - "29092:29092"   # external (host access)
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "kafka:9092", "--list"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  # ─── CSMS Stub (WireMock) ───────────────────────────────────────────────────
+  # Simulates the vendor Charging Station Management System API.
+  # Serves both the poll API and can accept webhook registrations.
+  #
+  # Stubs defined in ./wiremock/mappings/ cover:
+  #   - Normal poll responses (paginated events)
+  #   - 429 rate limiting scenarios
+  #   - 500 transient errors
+  #   - Malformed event batches
+  csms-stub:
+    image: wiremock/wiremock:3.6.0
+    container_name: gw-csms-stub
+    ports:
+      - "8099:8080"
+    volumes:
+      - ./wiremock:/home/wiremock
+    command: >
+      --verbose
+      --global-response-templating
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:8080/__admin/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ─── GridWatch Application ──────────────────────────────────────────────────
+  gridwatch:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gw-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      csms-stub:
+        condition: service_healthy
+    environment:
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: gridwatch
+      SPRING_DATASOURCE_USERNAME: gridwatch
+      SPRING_DATASOURCE_PASSWORD: gridwatch_dev
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Kafka
+      KAFKA_BROKERS: kafka:9092
+      # CSMS
+      CSMS_BASE_URL: http://csms-stub:8080
+      CSMS_WEBHOOK_SECRET: changeme-dev-secret
+      # Spring
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+volumes:
+  postgres_data:

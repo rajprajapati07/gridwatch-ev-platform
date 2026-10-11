@@ -1,0 +1,17 @@
+{
+  "name": "Webhook endpoint for operator op-india — accepts session events including meter reset",
+  "comment": "GridWatch posts to this on startup to register the webhook. Not used for receiving (GridWatch IS the receiver).",
+  "request": {
+    "method": "POST",
+    "urlPath": "/v1/webhooks/register"
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "webhook_id": "wh-dev-001",
+      "status": "registered",
+      "url": "http://gridwatch:8080/ingest/webhook/op-india"
+    }
+  }
+}

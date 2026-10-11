@@ -1,0 +1,21 @@
+{
+  "name": "Rate-limited response for site-002 — tests 429 backoff handling",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/v1/chargers",
+    "queryParameters": {
+      "site_id": { "equalTo": "site-002" }
+    }
+  },
+  "response": {
+    "status": 429,
+    "headers": {
+      "Content-Type": "application/json",
+      "Retry-After": "45"
+    },
+    "jsonBody": {
+      "error": "rate_limited",
+      "message": "Too many requests. Retry after 45 seconds."
+    }
+  }
+}

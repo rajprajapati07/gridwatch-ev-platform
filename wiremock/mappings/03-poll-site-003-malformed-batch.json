@@ -1,0 +1,57 @@
+{
+  "name": "Malformed event batch for site-003 — good events mixed with invalid ones",
+  "comment": "Tests the brief's scenario: events[42]=null energy, events[67]=missing connector_id. The 98 good events must still be processed.",
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/v1/chargers",
+    "queryParameters": {
+      "site_id": { "equalTo": "site-003" }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "site_id": "site-003",
+      "server_time": "2024-01-15T10:30:00Z",
+      "next_cursor": null,
+      "events": [
+        {
+          "charger_id": "CHR-003",
+          "connector_id": "C1",
+          "type": "status",
+          "status": "Available",
+          "ts": "2024-01-15T10:29:00Z"
+        },
+        {
+          "charger_id": "CHR-003",
+          "connector_id": "C1",
+          "type": "meter_value",
+          "energy_register_wh": null,
+          "ts": "2024-01-15T10:29:10Z"
+        },
+        {
+          "charger_id": "CHR-003",
+          "type": "status",
+          "status": "Charging",
+          "ts": "2024-01-15T10:29:20Z"
+        },
+        {
+          "charger_id": "CHR-003",
+          "connector_id": "C2",
+          "type": "status",
+          "status": "Faulted",
+          "ts": "2024-01-15T10:29:30Z"
+        },
+        {
+          "charger_id": "CHR-003",
+          "connector_id": "C2",
+          "type": "fault",
+          "fault_code": "E001",
+          "fault_severity": "Critical",
+          "ts": "2024-01-15T10:29:35Z"
+        }
+      ]
+    }
+  }
+}
