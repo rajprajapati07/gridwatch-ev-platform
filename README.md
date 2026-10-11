@@ -274,8 +274,3 @@ gridwatch-ev-platform/
 - [`docs/PART_A_ARCHITECTURE.md`](docs/PART_A_ARCHITECTURE.md) — Full architecture document: data model, ingestion design, storage decisions, GIS, real-time pipeline, HA/DR, capacity sizing, security, and observability
 - [`docs/PART_B_REVIEW.md`](docs/PART_B_REVIEW.md) — Architecture review: 13 findings ranked by blast radius, from tenant isolation to database sizing to GIS correctness
 
----
-
-## License
-
-MIT
